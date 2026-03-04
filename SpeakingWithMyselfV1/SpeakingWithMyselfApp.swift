@@ -5,7 +5,10 @@ struct SpeakingWithMyselfV1App: App {
     @StateObject private var dataStore = DataStore()
     @StateObject private var notificationManager = NotificationManager()
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+    @AppStorage("hasSeenNotificationUpdate") private var hasSeenNotificationUpdate = false
+    @AppStorage("appVersion") private var appVersion = ""
     @State private var showingSplash = true
+    @State private var showingNotificationAlert = false
     
     var body: some Scene {
         WindowGroup {
@@ -14,6 +17,16 @@ struct SpeakingWithMyselfV1App: App {
                     ContentView()
                         .environmentObject(dataStore)
                         .environmentObject(notificationManager)
+                        .onAppear {
+                            checkForUpdates()
+                        }
+                        .alert("Notifications Enabled", isPresented: $showingNotificationAlert) {
+                            Button("OK") {
+                                hasSeenNotificationUpdate = true
+                            }
+                        } message: {
+                            Text("Daily reminders are now enabled by default. You can customize notification times or disable them in Settings.")
+                        }
                 } else {
                     OnboardingView(hasCompletedOnboarding: $hasCompletedOnboarding)
                 }
@@ -31,6 +44,25 @@ struct SpeakingWithMyselfV1App: App {
                     }
                 }
             }
+        }
+    }
+    
+    private func checkForUpdates() {
+        let currentVersion = "1.1"
+        
+        // First time users or users updating from 1.0
+        if appVersion.isEmpty || appVersion == "1.0" {
+            // Enable notifications by default for new/updating users
+            if !notificationManager.reminderEnabled && !hasSeenNotificationUpdate {
+                Task {
+                    await notificationManager.enableReminder()
+                    // Show alert after splash screen
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
+                        showingNotificationAlert = true
+                    }
+                }
+            }
+            appVersion = currentVersion
         }
     }
 }

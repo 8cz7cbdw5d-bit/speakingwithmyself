@@ -11,42 +11,53 @@ struct TodayView: View {
     
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 24) {
-                    if dataStore.simulatedDate != nil {
-                        HStack {
-                            Image(systemName: "clock.badge.exclamationmark")
-                            Text("Time Travel: \(dataStore.effectiveToday, style: .date)")
-                        }
-                        .font(.caption)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(.orange)
-                        .clipShape(Capsule())
-                    }
-                    
-                    headerView
-                    
-                    if dataStore.currentTopic == nil {
-                        selectTopicPrompt
-                    } else if let prompt = dataStore.currentPrompt {
-                        topicAndDayBadge(prompt: prompt)
-                        dayProgressIndicator
-                        promptCard(prompt: prompt)
-                        
-                        if prompt.dayNumber > 1 {
-                            priorDayReference
+            VStack(spacing: 0) {
+                ScrollView {
+                    VStack(spacing: 24) {
+                        if dataStore.currentProgressionDay > 1 || dataStore.simulatedDate != nil {
+                            HStack {
+                                Image(systemName: "forward.fill")
+                                if dataStore.simulatedDate != nil {
+                                    Text("Dev Mode: \(dataStore.effectiveToday, style: .date)")
+                                } else {
+                                    Text("Question \(dataStore.currentProgressionDay) of 7")
+                                }
+                            }
+                            .font(.caption)
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(.indigo)
+                            .clipShape(Capsule())
                         }
                         
-                        if prompt.response != nil && !showingSavedConfirmation {
-                            completedReflectionView
-                        } else {
-                            reflectionInputView
+                        headerView
+                        
+                        if dataStore.currentTopic == nil {
+                            selectTopicPrompt
+                        } else if let prompt = dataStore.currentPrompt {
+                            topicAndDayBadge(prompt: prompt)
+                            dayProgressIndicator
+                            promptCard(prompt: prompt)
+                            
+                            if prompt.dayNumber > 1 {
+                                priorDayReference
+                            }
+                            
+                            if prompt.response != nil && !showingSavedConfirmation {
+                                completedReflectionView
+                            } else {
+                                reflectionInputViewScrollable
+                            }
                         }
+                        
+                        Spacer(minLength: 40)
                     }
-                    
-                    Spacer(minLength: 40)
+                }
+                
+                // Fixed button area when editing
+                if dataStore.currentPrompt?.response == nil && dataStore.currentTopic != nil && !showingSavedConfirmation {
+                    reflectionButtonArea
                 }
             }
             .onAppear {
@@ -251,7 +262,7 @@ struct TodayView: View {
             
             TextEditor(text: $responseText)
                 .focused($isTextEditorFocused)
-                .frame(minHeight: 150)
+                .frame(minHeight: 200, maxHeight: 400)
                 .padding(12)
                 .background(
                     RoundedRectangle(cornerRadius: 16)
@@ -261,6 +272,7 @@ struct TodayView: View {
                 .onChange(of: responseText) { _, newValue in
                     dataStore.saveDraft(newValue)
                 }
+                .id("textEditor")
             
             Button(action: saveResponse) {
                 HStack {
@@ -276,6 +288,7 @@ struct TodayView: View {
             }
             .disabled(responseText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             .opacity(responseText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.5 : 1)
+            .id("saveButton")
             
             Button(action: { showingTopicPicker = true }) {
                 HStack {
@@ -289,6 +302,63 @@ struct TodayView: View {
             .padding(.top, 8)
         }
         .padding(.horizontal)
+    }
+    
+    private var reflectionInputViewScrollable: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Your reflection")
+                .font(.headline)
+                .foregroundStyle(.secondary)
+            
+            TextEditor(text: $responseText)
+                .focused($isTextEditorFocused)
+                .frame(minHeight: 150, maxHeight: 300)
+                .padding(12)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color.indigo.opacity(0.3), lineWidth: 1)
+                )
+                .scrollContentBackground(.hidden)
+                .onChange(of: responseText) { _, newValue in
+                    dataStore.saveDraft(newValue)
+                }
+        }
+        .padding(.horizontal)
+    }
+    
+    private var reflectionButtonArea: some View {
+        VStack(spacing: 12) {
+            Divider()
+            
+            VStack(spacing: 12) {
+                Button(action: saveResponse) {
+                    HStack {
+                        Image(systemName: "checkmark.circle.fill")
+                        Text("Save Reflection")
+                    }
+                    .font(.headline)
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(.indigo)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                }
+                .disabled(responseText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .opacity(responseText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.5 : 1)
+                
+                Button(action: { showingTopicPicker = true }) {
+                    HStack {
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                        Text("Switch Topic")
+                    }
+                    .font(.subheadline)
+                    .foregroundStyle(.indigo)
+                }
+            }
+            .padding(.horizontal)
+            .padding(.bottom, 8)
+        }
+        .background(.ultraThinMaterial)
     }
     
     private var completedReflectionView: some View {
@@ -348,10 +418,10 @@ struct TodayView: View {
                 
                 if dataStore.currentDayInCycle < 7 {
                     Button(action: {
-                        dataStore.advanceSimulatedDay()
+                        dataStore.advanceToNextQuestion()
                         responseText = ""
                     }) {
-                        Text("Next Day")
+                        Text("Next Question")
                             .font(.subheadline)
                             .foregroundStyle(.green)
                     }

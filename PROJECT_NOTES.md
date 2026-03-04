@@ -90,3 +90,23 @@ SpeakingWithMyselfV1/
 
 ## Next Steps / Future Features
 - (Add feature ideas here as you work on them)
+
+## Development Guidelines
+
+### Data Preservation - CRITICAL
+When implementing updates to the app, it is IMPERATIVE that we do not lose user data:
+- All user responses are stored in UserDefaults under the "savedPrompts" key
+- Always test data migration when changing data models
+- Verify existing prompts and responses are preserved after updates
+- Test with simulated existing data before releasing updates
+- Never remove or rename UserDefaults keys without migration logic
+
+### Version History
+- v1.0: Initial release (February 2026)
+- v1.1: (In development)
+  - Notifications enabled by default with one-time informational alert
+  - Added second "Time to Write" notification option (disabled by default)
+  - Added "Retain Question Until Completed" mode to keep questions until answered
+  - History now shows "Answered [date]" for clearer context
+  - Improved text editor UX with better keyboard/save button visibility
+  - All changes preserve existing user data

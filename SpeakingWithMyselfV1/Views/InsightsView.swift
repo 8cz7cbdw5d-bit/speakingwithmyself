@@ -60,8 +60,9 @@ struct InsightsView: View {
                                     }
                                 }
                             
-                            Text(DayCycle.cycle[day-1].label.prefix(3))
-                                .font(.system(size: 8))
+                            Text("\(day)")
+                                .font(.system(size: 10))
+                                .fontWeight(.medium)
                                 .foregroundStyle(.secondary)
                         }
                     }

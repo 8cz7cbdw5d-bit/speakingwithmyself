@@ -9,6 +9,8 @@ class DataStore: ObservableObject {
     @Published var currentCorePromptIndex: Int = 0
     @Published var simulatedDate: Date? = nil
     @Published var draftResponse: String = ""
+    @Published var retainQuestionUntilCompleted: Bool = false
+    @Published var currentProgressionDay: Int = 1  // Which question in cycle (1-7), independent of dates
     
     private let userDefaults = UserDefaults.standard
     private let promptsKey = "savedPrompts"
@@ -17,6 +19,8 @@ class DataStore: ObservableObject {
     private let corePromptIndexKey = "corePromptIndex"
     private let simulatedDateKey = "simulatedDate"
     private let draftResponseKey = "draftResponse"
+    private let retainQuestionKey = "retainQuestionUntilCompleted"
+    private let progressionDayKey = "currentProgressionDay"
     
     var effectiveToday: Date {
         let calendar = Calendar.current
@@ -114,6 +118,9 @@ class DataStore: ObservableObject {
         loadCurrentTopic()
         loadSimulatedDate()
         loadDraft()
+        loadRetainQuestionSetting()
+        loadProgressionDay()
+        migrateToProgressionSystem()
         setupTodaysPrompt()
     }
     
@@ -168,16 +175,47 @@ class DataStore: ObservableObject {
     }
     
     func advanceSimulatedDay() {
+        // Legacy dev tool - still uses simulated date for testing
         let calendar = Calendar.current
         let newDate = calendar.date(byAdding: .day, value: 1, to: effectiveToday)!
         setSimulatedDate(newDate)
+    }
+    
+    func advanceToNextQuestion() {
+        // User-facing feature to move to next question in the cycle
+        // This advances progression without manipulating dates
+        
+        // If we're in retain mode and haven't answered, don't advance
+        if retainQuestionUntilCompleted,
+           let current = currentPrompt,
+           current.response == nil || current.response?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == true {
+            return
+        }
+        
+        // Don't advance past day 7
+        if currentProgressionDay >= 7 { return }
+        
+        // Advance progression counter
+        currentProgressionDay += 1
+        saveProgressionDay()
+        
+        // Clear current prompt so setupTodaysPrompt creates a new one
+        let calendar = Calendar.current
+        let today = effectiveToday
+        prompts.removeAll { calendar.isDate($0.date, inSameDayAs: today) }
+        currentPrompt = nil
+        
+        // Create new prompt with advanced progression
+        setupTodaysPrompt()
     }
     
     func selectTopic(_ topic: WeeklyTopic, promptIndex: Int = 0) {
         currentTopic = topic
         currentWeekStartDate = effectiveToday
         currentCorePromptIndex = promptIndex
+        currentProgressionDay = 1  // Reset progression to day 1
         saveCurrentTopic()
+        saveProgressionDay()
         
         let calendar = Calendar.current
         prompts.removeAll { calendar.isDate($0.date, inSameDayAs: effectiveToday) }
@@ -211,8 +249,31 @@ class DataStore: ObservableObject {
             return
         }
         
+        // If retain mode is enabled, check if we should keep the current question
+        if retainQuestionUntilCompleted {
+            let yesterday = calendar.date(byAdding: .day, value: -1, to: today)!
+            if let yesterdayPrompt = prompts.first(where: { calendar.isDate($0.date, inSameDayAs: yesterday) }),
+               yesterdayPrompt.response == nil || yesterdayPrompt.response?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == true {
+                // Yesterday's question wasn't answered, keep it for today
+                let retainedPrompt = DailyPrompt(
+                    date: today,
+                    question: yesterdayPrompt.question,
+                    topic: yesterdayPrompt.topic,
+                    weekNumber: yesterdayPrompt.weekNumber,
+                    dayNumber: yesterdayPrompt.dayNumber,
+                    dayLabel: yesterdayPrompt.dayLabel
+                )
+                currentPrompt = retainedPrompt
+                prompts.insert(retainedPrompt, at: 0)
+                prompts.sort { $0.date > $1.date }
+                savePrompts()
+                return
+            }
+        }
+        
+        // Use progression day instead of calculating from date
+        let dayInCycle = currentProgressionDay
         let daysSinceStart = calendar.dateComponents([.day], from: weekStart, to: today).day ?? 0
-        let dayInCycle = (daysSinceStart % 7) + 1
         let weekNumber = (daysSinceStart / 7) + 1
         
         let dayCycle = DayCycle.cycle[dayInCycle - 1]
@@ -274,10 +335,7 @@ class DataStore: ObservableObject {
     }
     
     var currentDayInCycle: Int {
-        guard let weekStart = currentWeekStartDate else { return 1 }
-        let calendar = Calendar.current
-        let daysSinceStart = calendar.dateComponents([.day], from: weekStart, to: effectiveToday).day ?? 0
-        return (daysSinceStart % 7) + 1
+        return currentProgressionDay
     }
     
     var yesterdaysPrompt: DailyPrompt? {
@@ -298,5 +356,44 @@ class DataStore: ObservableObject {
     func clearDraft() {
         draftResponse = ""
         userDefaults.removeObject(forKey: draftResponseKey)
+    }
+    
+    func loadRetainQuestionSetting() {
+        retainQuestionUntilCompleted = userDefaults.bool(forKey: retainQuestionKey)
+    }
+    
+    func saveRetainQuestionSetting() {
+        userDefaults.set(retainQuestionUntilCompleted, forKey: retainQuestionKey)
+    }
+    
+    func loadProgressionDay() {
+        let saved = userDefaults.integer(forKey: progressionDayKey)
+        currentProgressionDay = saved > 0 ? saved : 1
+    }
+    
+    func saveProgressionDay() {
+        userDefaults.set(currentProgressionDay, forKey: progressionDayKey)
+    }
+    
+    func migrateToProgressionSystem() {
+        // Migrate existing users from date-based to progression-based system
+        // If they have a topic but no progression day set, calculate it from their current state
+        guard currentTopic != nil else { return }
+        
+        let saved = userDefaults.integer(forKey: progressionDayKey)
+        if saved == 0 {
+            // First time - set progression based on current day in cycle
+            if let weekStart = currentWeekStartDate {
+                let calendar = Calendar.current
+                let today = effectiveToday
+                let daysSinceStart = calendar.dateComponents([.day], from: weekStart, to: today).day ?? 0
+                let calculatedDay = (daysSinceStart % 7) + 1
+                currentProgressionDay = calculatedDay
+                saveProgressionDay()
+            } else {
+                currentProgressionDay = 1
+                saveProgressionDay()
+            }
+        }
     }
 }

@@ -1,0 +1,19 @@
+What's New in Version 1.1
+
+We've made thoughtful improvements to help you build a consistent reflection practice:
+
+• Notifications enabled by default - Gentle daily reminders to check in with yourself (customize or disable in Settings)
+
+• Optional "Time to Write" reminder - Set a second notification for when you're ready to reflect (great for evening writing!)
+
+• Keep questions until ready - New setting to retain questions until you answer them, instead of advancing daily
+
+• Power through when inspired - Tap "Next Question" to continue your journey when insights are flowing
+
+• Better history context - See when you actually answered each question for clearer reflection tracking
+
+• Polish & improvements - Cleaner progress indicators, better text editor, smoother experience
+
+All your existing reflections are preserved and safe. Everything stays private on your device.
+
+Thank you for showing up for yourself every day.

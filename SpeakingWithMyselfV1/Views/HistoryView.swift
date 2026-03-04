@@ -68,9 +68,16 @@ struct HistoryRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text(prompt.date, style: .date)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                // Show when they actually responded with journey context
+                if let respondedDate = prompt.respondedAt {
+                    Text("Answered \(respondedDate, style: .date)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text(prompt.date, style: .date)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 
                 Spacer()
                 
